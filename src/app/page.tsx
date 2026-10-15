@@ -78,7 +78,7 @@ export default function HomePage() {
             onChange={(e) => setPrompt(e.target.value)}
             rows={5}
             placeholder="描述你想做的应用…"
-            className="w-full resize-y rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm outline-none focus:border-[var(--accent)]"
+            className="w-full resize-y rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--muted)] outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:text-[var(--text)]"
           />
           <div className="flex flex-wrap gap-2">
             {EXAMPLES.map((ex) => (
