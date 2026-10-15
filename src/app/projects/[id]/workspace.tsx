@@ -422,7 +422,7 @@ export function ProjectWorkspace({ id }: { id: string }) {
               rows={2}
               disabled={busy}
               placeholder="迭代需求，例如：按环境筛选默认 prod，主色改深蓝"
-              className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+              className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[#8b95a5] outline-none placeholder:text-[#b0b8c4] focus:border-[var(--accent)] focus:text-[var(--text)]"
             />
             <button
               type="submit"
