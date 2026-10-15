@@ -3,7 +3,7 @@
 自然语言生成可预览应用，支持 **预检 → 发布（公开 Demo 页）→ 回滚**。
 
 - Demo：http://134.175.134.145/
-- 设计说明：[docs/notes.md](./docs/notes.md)
+- 笔试作品说明：[docs/notes.md](./docs/notes.md)
 
 「发布」= 保存不可变版本快照并开放本站 `/p/:id` 预览，**不是**生产集群 / CDN 部署。
 
