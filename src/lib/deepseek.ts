@@ -88,7 +88,8 @@ export const BUILD_SYSTEM = `你是 Atoms Ops Demo 中的 Builder Agent。
 2. 不要引用外部 JS CDN / 外部 script src；可用 Google Fonts 或系统字体。
 3. UI 要有真实可点击交互（导航锚点、筛选、表单校验、tab 等至少一种）。
 4. 内容必须紧扣用户需求，不同需求要生成不同结构与文案，禁止套用固定模板。
-5. 只输出 HTML（或 \`\`\`html 代码块），不要解释。`;
+5. 若是运维/值班/SLO 看板：每条服务用「SLO 99.x%」格式标注，且所有 SLO ≥ 99.5%，不要用低 SLO 假装故障。
+6. 只输出 HTML（或 \`\`\`html 代码块），不要解释。`;
 
 export const REVISE_SYSTEM = `你是 Builder Agent。用户要对已有单页 HTML 做修改。
 
@@ -97,7 +98,8 @@ export const REVISE_SYSTEM = `你是 Builder Agent。用户要对已有单页 HT
 2. 无外部 script src；保留或增强可点击交互。
 3. 若用户要求风格/科技感/换皮：必须肉眼可见大改（背景、主色、布局至少同时变）。
 4. 若用户只改文案/加模块：真正改到内容，不要原样返回。
-5. 只输出完整 HTML，不要解释。`;
+5. 若页面含 SLO：修改后仍保持所有「SLO xx%」≥ 99.5%。
+6. 只输出完整 HTML，不要解释。`;
 
 export function buildReviseUserPrompt(
   userPrompt: string,

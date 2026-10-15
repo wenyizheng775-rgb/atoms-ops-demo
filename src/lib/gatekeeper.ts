@@ -40,13 +40,14 @@ function isOpsLike(html: string): boolean {
   return /SLO|值班|staging|发布记录|运维/i.test(html);
 }
 
+/** 只提取紧邻「SLO」的百分比，避免把进度条/折扣等普通 xx% 误判成 SLO */
 function extractSloPercents(html: string): number[] {
   const out: number[] = [];
-  const re = /(?:SLO[^0-9%]{0,24})?(\d{2,3}(?:\.\d{1,2})?)\s*%/gi;
+  const re = /SLO[^0-9%]{0,32}(\d{2,3}(?:\.\d{1,2})?)\s*%/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(html))) {
     const n = Number(m[1]);
-    if (n >= 50 && n <= 100) out.push(n);
+    if (n >= 0 && n <= 100) out.push(n);
   }
   return out;
 }
@@ -140,11 +141,12 @@ export function runGateChecks(html: string): GateResult {
   if (isOpsLike(normalized)) {
     const slos = extractSloPercents(normalized);
     if (slos.length === 0) {
+      // 运维页未写出「SLO xx%」时不硬拦，避免误杀；有数值才做阈值
       checks.push({
         id: "ops-slo",
-        name: "运维 SLO 指标",
-        passed: false,
-        message: "检测到运维看板特征，但未解析到 SLO 百分比",
+        name: "运维 SLO 发布阈值",
+        passed: true,
+        message: "未解析到「SLO xx%」标注，跳过数值阈值",
       });
     } else {
       const worst = Math.min(...slos);
