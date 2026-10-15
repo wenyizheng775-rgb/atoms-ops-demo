@@ -10,12 +10,7 @@ import type {
   StepReality,
   StoreData,
 } from "./types";
-import {
-  GATE_DEMO_ID,
-  SHOWCASE_ID,
-  buildGateDemoProject,
-  buildShowcaseProject,
-} from "./seed";
+import { GATE_DEMO_ID, SHOWCASE_ID } from "./constants";
 import { runGateChecks } from "./gatekeeper";
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -91,50 +86,22 @@ async function writeStore(data: StoreData): Promise<void> {
   await fs.rename(tmp, STORE_PATH);
 }
 
-/** 确保 Showcase / Gate 演示项目存在（不覆盖用户已改过的同 ID） */
+/**
+ * 读取并迁移项目列表。
+ * 不再自动插入预置 Showcase / 门禁失败样例（首页更干净）；
+ * 若库里仍有旧预置项，启动时清掉。
+ */
 export async function ensureSeedProjects(): Promise<StoreData> {
   const store = await readStore();
-  let changed = false;
-
-  const showcase = store.projects.find((p) => p.id === SHOWCASE_ID);
-  if (!showcase) {
-    store.projects.unshift(buildShowcaseProject());
-    changed = true;
-  } else {
-    const fresh = buildShowcaseProject();
-    if (
-      showcase.name.includes("Showcase") ||
-      showcase.name.includes("【") ||
-      !showcase.releases?.length ||
-      (showcase.versions[0] &&
-        !runGateChecks(showcase.versions[0].html).ok)
-    ) {
-      Object.assign(showcase, {
-        name: fresh.name,
-        messages: fresh.messages,
-        versions: fresh.versions,
-        releases: fresh.releases,
-        currentVersionId: fresh.currentVersionId,
-        publishedVersionId: fresh.publishedVersionId,
-        lastGate: fresh.lastGate,
-        status: fresh.status,
-      });
-      changed = true;
-    }
-  }
-
-  const gateDemo = store.projects.find((p) => p.id === GATE_DEMO_ID);
-  if (!gateDemo) {
-    store.projects.push(buildGateDemoProject());
-    changed = true;
-  } else if (gateDemo.name.includes("演示") || gateDemo.name.includes("【")) {
-    const fresh = buildGateDemoProject();
-    gateDemo.name = fresh.name;
-    gateDemo.prompt = fresh.prompt;
-    gateDemo.messages = fresh.messages;
-    changed = true;
-  }
-  if (changed || !store.seededAt) {
+  const before = store.projects.length;
+  store.projects = store.projects.filter(
+    (p) =>
+      p.id !== SHOWCASE_ID &&
+      p.id !== GATE_DEMO_ID &&
+      p.tag !== "showcase" &&
+      p.tag !== "gate-demo",
+  );
+  if (store.projects.length !== before || !store.seededAt) {
     store.seededAt = new Date().toISOString();
     await writeStore(store);
   }
@@ -143,13 +110,9 @@ export async function ensureSeedProjects(): Promise<StoreData> {
 
 export async function listProjects(): Promise<Project[]> {
   const store = await ensureSeedProjects();
-  return store.projects.sort((a, b) => {
-    const rank = (p: Project) =>
-      p.tag === "showcase" ? 0 : p.tag === "gate-demo" ? 2 : 1;
-    const r = rank(a) - rank(b);
-    if (r !== 0) return r;
-    return +new Date(b.updatedAt) - +new Date(a.updatedAt);
-  });
+  return store.projects.sort(
+    (a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt),
+  );
 }
 
 export async function getProject(id: string): Promise<Project | null> {
@@ -224,9 +187,6 @@ export async function saveProject(project: Project): Promise<Project> {
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  if (id === SHOWCASE_ID || id === GATE_DEMO_ID) {
-    throw new Error("预置演示项目不可删除");
-  }
   return withWriteLock(async () => {
     const store = await ensureSeedProjects();
     store.projects = store.projects.filter((p) => p.id !== id);

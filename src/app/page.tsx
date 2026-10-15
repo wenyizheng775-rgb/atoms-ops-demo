@@ -26,12 +26,28 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  async function refresh() {
+    const res = await fetch("/api/projects");
+    const d = await res.json();
+    setProjects(d.projects ?? []);
+  }
+
   useEffect(() => {
-    fetch("/api/projects")
-      .then((r) => r.json())
-      .then((d) => setProjects(d.projects ?? []))
-      .catch(() => setProjects([]));
+    refresh().catch(() => setProjects([]));
   }, []);
+
+  async function removeProject(id: string, e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm("确定删除该项目？")) return;
+    const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "删除失败");
+      return;
+    }
+    await refresh();
+  }
 
   async function onCreate(e?: React.FormEvent) {
     e?.preventDefault();
@@ -78,7 +94,7 @@ export default function HomePage() {
             onChange={(e) => setPrompt(e.target.value)}
             rows={5}
             placeholder="描述你想做的应用…"
-            className="w-full resize-y rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--muted)] outline-none placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:text-[var(--text)]"
+            className="w-full resize-y rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[#8b95a5] outline-none placeholder:text-[#b0b8c4] focus:border-[var(--accent)] focus:text-[var(--text)]"
           />
           <div className="flex flex-wrap gap-2">
             {EXAMPLES.map((ex) => (
@@ -113,14 +129,21 @@ export default function HomePage() {
               </li>
             )}
             {projects.map((p) => (
-              <li key={p.id}>
+              <li key={p.id} className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-[var(--bg)]">
                 <a
                   href={`/projects/${p.id}`}
-                  className="flex items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-[var(--bg)]"
+                  className="flex min-w-0 flex-1 items-center justify-between gap-3"
                 >
                   <span className="min-w-0 truncate font-medium">{p.name}</span>
                   <StatusText status={p.status} />
                 </a>
+                <button
+                  type="button"
+                  onClick={(e) => removeProject(p.id, e)}
+                  className="shrink-0 text-xs text-[var(--muted)] hover:text-[var(--danger)]"
+                >
+                  删除
+                </button>
               </li>
             ))}
           </ul>
