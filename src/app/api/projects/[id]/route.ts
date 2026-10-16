@@ -1,19 +1,20 @@
 import { NextResponse } from "next/server";
-import { deleteProject, getProject } from "@/lib/store";
+import { requireOwnedProject } from "@/lib/access";
+import { deleteProject } from "@/lib/store";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function GET(_req: Request, ctx: Ctx) {
+export async function GET(req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
-  const project = await getProject(id);
-  if (!project) {
-    return NextResponse.json({ error: "未找到项目" }, { status: 404 });
-  }
-  return NextResponse.json({ project });
+  const result = await requireOwnedProject(req, id);
+  if (result.error) return result.error;
+  return NextResponse.json({ project: result.project });
 }
 
-export async function DELETE(_req: Request, ctx: Ctx) {
+export async function DELETE(req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
+  const result = await requireOwnedProject(req, id);
+  if (result.error) return result.error;
   try {
     await deleteProject(id);
     return NextResponse.json({ ok: true });

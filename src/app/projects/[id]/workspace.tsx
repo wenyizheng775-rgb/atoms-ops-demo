@@ -22,6 +22,10 @@ export function ProjectWorkspace({ id }: { id: string }) {
   const load = useCallback(async () => {
     const res = await fetch(`/api/projects/${id}`);
     const data = await res.json();
+    if (res.status === 401) {
+      window.location.href = `/login?next=/projects/${id}`;
+      throw new Error("请先登录");
+    }
     if (!res.ok) throw new Error(data.error || "加载失败");
     setProject(data.project);
     return data.project as Project;

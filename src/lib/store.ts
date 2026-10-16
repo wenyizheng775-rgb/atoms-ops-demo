@@ -7,8 +7,11 @@ import type {
   AuditEntry,
   ChatMessage,
   Project,
+  PublicUser,
+  Session,
   StepReality,
   StoreData,
+  User,
 } from "./types";
 import { GATE_DEMO_ID, SHOWCASE_ID } from "./constants";
 import { runGateChecks } from "./gatekeeper";
@@ -76,6 +79,11 @@ async function readStore(): Promise<StoreData> {
   const raw = await fs.readFile(STORE_PATH, "utf-8");
   const data = JSON.parse(raw) as StoreData;
   data.projects = (data.projects ?? []).map(migrateProject);
+  data.users = data.users ?? [];
+  const now = Date.now();
+  data.sessions = (data.sessions ?? []).filter(
+    (s) => +new Date(s.expiresAt) > now,
+  );
   return data;
 }
 
@@ -108,11 +116,11 @@ export async function ensureSeedProjects(): Promise<StoreData> {
   return store;
 }
 
-export async function listProjects(): Promise<Project[]> {
+export async function listProjects(userId: string): Promise<Project[]> {
   const store = await ensureSeedProjects();
-  return store.projects.sort(
-    (a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt),
-  );
+  return store.projects
+    .filter((p) => !p.ownerId || p.ownerId === userId)
+    .sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
 }
 
 export async function getProject(id: string): Promise<Project | null> {
@@ -129,15 +137,84 @@ export async function getProject(id: string): Promise<Project | null> {
   return project;
 }
 
+export function toPublicUser(user: User): PublicUser {
+  return { id: user.id, name: user.name, email: user.email };
+}
+
+export async function findUserByEmail(email: string): Promise<User | null> {
+  const store = await readStore();
+  const key = email.trim().toLowerCase();
+  return store.users?.find((u) => u.email === key) ?? null;
+}
+
+export async function createUser(input: {
+  name: string;
+  email: string;
+  passwordHash: string;
+}): Promise<User> {
+  return withWriteLock(async () => {
+    const store = await readStore();
+    const email = input.email.trim().toLowerCase();
+    if (store.users!.some((u) => u.email === email)) {
+      throw new Error("该邮箱已注册");
+    }
+    const user: User = {
+      id: randomUUID(),
+      name: input.name.trim(),
+      email,
+      passwordHash: input.passwordHash,
+      createdAt: new Date().toISOString(),
+    };
+    store.users!.push(user);
+    await writeStore(store);
+    return user;
+  });
+}
+
+export async function createSession(userId: string): Promise<Session> {
+  return withWriteLock(async () => {
+    const store = await readStore();
+    const session: Session = {
+      id: randomUUID(),
+      userId,
+      expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+    store.sessions!.push(session);
+    await writeStore(store);
+    return session;
+  });
+}
+
+export async function deleteSession(sessionId: string): Promise<void> {
+  return withWriteLock(async () => {
+    const store = await readStore();
+    store.sessions = (store.sessions ?? []).filter((s) => s.id !== sessionId);
+    await writeStore(store);
+  });
+}
+
+export async function userFromSession(
+  sessionId: string | null,
+): Promise<PublicUser | null> {
+  if (!sessionId) return null;
+  const store = await readStore();
+  const session = store.sessions?.find((s) => s.id === sessionId);
+  if (!session) return null;
+  const user = store.users?.find((u) => u.id === session.userId);
+  return user ? toPublicUser(user) : null;
+}
+
 export async function createProject(input: {
   name: string;
   prompt: string;
+  ownerId: string;
 }): Promise<Project> {
   return withWriteLock(async () => {
     const store = await ensureSeedProjects();
     const now = new Date().toISOString();
     const project: Project = {
       id: randomUUID(),
+      ownerId: input.ownerId,
       name: input.name,
       prompt: input.prompt,
       status: "draft",

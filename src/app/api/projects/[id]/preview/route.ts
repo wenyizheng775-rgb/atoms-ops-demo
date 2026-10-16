@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
+import { canAccessProject } from "@/lib/access";
 import { getProject } from "@/lib/store";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -21,7 +23,14 @@ export async function GET(req: Request, ctx: Ctx) {
     return new NextResponse("尚无预览产物，请先完成构建", { status: 404 });
   }
 
-  // 注入 base，降低相对路径误导航到本站的概率
+  const isPublishedSnapshot = project.publishedVersionId === version.id;
+  if (!isPublishedSnapshot) {
+    const user = await getCurrentUser(req);
+    if (!user || !canAccessProject(project, user.id)) {
+      return new NextResponse("请先登录", { status: 401 });
+    }
+  }
+
   const html = version.html.includes("<head>")
     ? version.html.replace("<head>", '<head><base target="_blank">')
     : version.html;

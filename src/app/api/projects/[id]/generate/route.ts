@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getProject } from "@/lib/store";
+import { requireOwnedProject } from "@/lib/access";
 import { runBuildPipeline } from "@/lib/orchestrator";
 import { checkRateLimit, clientKeyFromRequest } from "@/lib/rate-limit";
 
@@ -23,10 +23,9 @@ export async function POST(req: Request, ctx: Ctx) {
     );
   }
 
-  const project = await getProject(id);
-  if (!project) {
-    return NextResponse.json({ error: "未找到项目" }, { status: 404 });
-  }
+  const result = await requireOwnedProject(req, id);
+  if (result.error) return result.error;
+  const project = result.project;
 
   if (project.status === "building") {
     return NextResponse.json(

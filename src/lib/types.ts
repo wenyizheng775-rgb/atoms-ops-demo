@@ -73,8 +73,30 @@ export interface ReleaseRecord {
 
 export type ProjectTag = "showcase" | "gate-demo" | "normal";
 
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  passwordHash: string;
+  createdAt: string;
+}
+
+export interface Session {
+  id: string;
+  userId: string;
+  expiresAt: string;
+}
+
+export interface PublicUser {
+  id: string;
+  name: string;
+  email: string;
+}
+
 export interface Project {
   id: string;
+  /** 为空表示升级前的旧项目，任意已登录用户可见 */
+  ownerId?: string | null;
   name: string;
   prompt: string;
   status: "draft" | "building" | "ready" | "published" | "failed";
@@ -94,5 +116,7 @@ export interface Project {
 
 export interface StoreData {
   projects: Project[];
+  users?: User[];
+  sessions?: Session[];
   seededAt?: string;
 }

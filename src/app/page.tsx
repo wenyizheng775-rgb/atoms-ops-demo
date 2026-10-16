@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Project } from "@/lib/types";
+import type { Project, PublicUser } from "@/lib/types";
 import { JUDGE_DEMO_PROMPT } from "@/lib/constants";
 
 const EXAMPLES: { label: string; prompt: string }[] = [
@@ -21,20 +21,44 @@ const EXAMPLES: { label: string; prompt: string }[] = [
 
 export default function HomePage() {
   const router = useRouter();
+  const [user, setUser] = useState<PublicUser | null | undefined>(undefined);
   const [projects, setProjects] = useState<Project[]>([]);
   const [prompt, setPrompt] = useState(EXAMPLES[0].prompt);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function refresh() {
+  async function refreshUser() {
+    const res = await fetch("/api/auth/me");
+    const d = await res.json();
+    setUser(d.user ?? null);
+    return d.user as PublicUser | null;
+  }
+
+  async function refreshProjects() {
     const res = await fetch("/api/projects");
+    if (res.status === 401) {
+      setProjects([]);
+      return;
+    }
     const d = await res.json();
     setProjects(d.projects ?? []);
   }
 
   useEffect(() => {
-    refresh().catch(() => setProjects([]));
+    refreshUser()
+      .then((u) => {
+        if (u) return refreshProjects();
+        setProjects([]);
+      })
+      .catch(() => setUser(null));
   }, []);
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    setUser(null);
+    setProjects([]);
+    router.refresh();
+  }
 
   async function removeProject(id: string, e: React.MouseEvent) {
     e.preventDefault();
@@ -46,11 +70,15 @@ export default function HomePage() {
       alert(data.error || "删除失败");
       return;
     }
-    await refresh();
+    await refreshProjects();
   }
 
   async function onCreate(e?: React.FormEvent) {
     e?.preventDefault();
+    if (!user) {
+      router.push("/login");
+      return;
+    }
     if (!prompt.trim() || loading) return;
     setLoading(true);
     setError(null);
@@ -76,7 +104,34 @@ export default function HomePage() {
           <div className="text-sm font-semibold tracking-tight">
             Atoms Ops Demo
           </div>
-          <div className="text-xs text-[var(--muted)]">郑文怡</div>
+          <div className="flex items-center gap-3 text-xs text-[var(--muted)]">
+            {user === undefined ? (
+              <span>…</span>
+            ) : user ? (
+              <>
+                <span>{user.name}</span>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="hover:text-[var(--text)]"
+                >
+                  退出
+                </button>
+              </>
+            ) : (
+              <>
+                <a href="/login" className="hover:text-[var(--text)]">
+                  登录
+                </a>
+                <a
+                  href="/register"
+                  className="rounded-lg bg-[var(--accent)] px-2.5 py-1 font-medium text-white"
+                >
+                  注册
+                </a>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -88,13 +143,28 @@ export default function HomePage() {
           预检 → 发布 → 回滚
         </p>
 
+        {!user && user !== undefined && (
+          <div className="mt-6 rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--muted)]">
+            请先{" "}
+            <a href="/login" className="text-[var(--accent)]">
+              登录
+            </a>{" "}
+            或{" "}
+            <a href="/register" className="text-[var(--accent)]">
+              注册
+            </a>{" "}
+            后再开始构建。已发布的公开页无需登录即可访问。
+          </div>
+        )}
+
         <form onSubmit={onCreate} className="mt-8 space-y-3">
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             rows={5}
             placeholder="描述你想做的应用…"
-            className="w-full resize-y rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[#8b95a5] outline-none placeholder:text-[#b0b8c4] focus:border-[var(--accent)] focus:text-[var(--text)]"
+            disabled={!user}
+            className="w-full resize-y rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[#8b95a5] outline-none placeholder:text-[#b0b8c4] focus:border-[var(--accent)] focus:text-[var(--text)] disabled:opacity-60"
           />
           <div className="flex flex-wrap gap-2">
             {EXAMPLES.map((ex) => (
@@ -102,7 +172,8 @@ export default function HomePage() {
                 key={ex.label}
                 type="button"
                 onClick={() => setPrompt(ex.prompt)}
-                className="rounded-lg border border-[var(--border)] bg-white px-3 py-1 text-xs text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--text)]"
+                disabled={!user}
+                className="rounded-lg border border-[var(--border)] bg-white px-3 py-1 text-xs text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--text)] disabled:opacity-50"
               >
                 {ex.label}
               </button>
@@ -111,10 +182,10 @@ export default function HomePage() {
           {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
           <button
             type="submit"
-            disabled={loading || !prompt.trim()}
+            disabled={loading || !prompt.trim() || !user}
             className="rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
           >
-            {loading ? "创建中…" : "开始构建"}
+            {!user ? "请先登录" : loading ? "创建中…" : "开始构建"}
           </button>
         </form>
 
@@ -123,13 +194,21 @@ export default function HomePage() {
             最近项目
           </h2>
           <ul className="mt-3 divide-y divide-[var(--border)] rounded-xl border border-[var(--border)] bg-white">
-            {projects.length === 0 && (
+            {!user && (
+              <li className="px-4 py-6 text-sm text-[var(--muted)]">
+                登录后可查看你的项目
+              </li>
+            )}
+            {user && projects.length === 0 && (
               <li className="px-4 py-6 text-sm text-[var(--muted)]">
                 还没有项目
               </li>
             )}
             {projects.map((p) => (
-              <li key={p.id} className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-[var(--bg)]">
+              <li
+                key={p.id}
+                className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-[var(--bg)]"
+              >
                 <a
                   href={`/projects/${p.id}`}
                   className="flex min-w-0 flex-1 items-center justify-between gap-3"
