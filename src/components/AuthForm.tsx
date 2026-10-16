@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type Mode = "login" | "register";
@@ -11,8 +11,44 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+
+  async function sendCode() {
+    if (sending || cooldown > 0) return;
+    setError(null);
+    setHint(null);
+    if (!email.trim()) {
+      setError("请先填写邮箱");
+      return;
+    }
+    setSending(true);
+    try {
+      const res = await fetch("/api/auth/send-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "发送失败");
+      setHint("验证码已发送，请查收邮箱（含垃圾箱）");
+      setCooldown(60);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSending(false);
+    }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,7 +64,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           body: JSON.stringify(
             mode === "login"
               ? { email, password }
-              : { name, email, password },
+              : { name, email, password, code },
           ),
         },
       );
@@ -54,7 +90,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
       <p className="mt-2 text-sm text-[var(--muted)]">
         {mode === "login"
           ? "登录后可创建项目、预检与发布。"
-          : "注册后即可使用自然语言构建应用。"}
+          : "注册需邮箱验证码（QQ SMTP），验证邮箱归属后再建账号。"}
       </p>
 
       <form onSubmit={onSubmit} className="mt-8 space-y-3">
@@ -76,6 +112,31 @@ export function AuthForm({ mode }: { mode: Mode }) {
           required
           className="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
         />
+        {mode === "register" && (
+          <div className="flex gap-2">
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="6 位验证码"
+              required
+              inputMode="numeric"
+              maxLength={6}
+              className="min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
+            />
+            <button
+              type="button"
+              onClick={sendCode}
+              disabled={sending || cooldown > 0}
+              className="shrink-0 rounded-xl border border-[var(--border)] px-3 py-2.5 text-xs font-medium text-[var(--text)] disabled:opacity-50"
+            >
+              {sending
+                ? "发送中…"
+                : cooldown > 0
+                  ? `${cooldown}s`
+                  : "获取验证码"}
+            </button>
+          </div>
+        )}
         <input
           type="password"
           value={password}
@@ -85,6 +146,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           minLength={6}
           className="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
         />
+        {hint && <p className="text-sm text-[var(--ok)]">{hint}</p>}
         {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
         <button
           type="submit"

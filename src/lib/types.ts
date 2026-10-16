@@ -114,9 +114,18 @@ export interface Project {
   audit: AuditEntry[];
 }
 
+export interface EmailCode {
+  email: string;
+  code: string;
+  purpose: "register";
+  expiresAt: string;
+  createdAt: string;
+}
+
 export interface StoreData {
   projects: Project[];
   users?: User[];
   sessions?: Session[];
+  emailCodes?: EmailCode[];
   seededAt?: string;
 }

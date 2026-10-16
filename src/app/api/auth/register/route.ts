@@ -1,16 +1,25 @@
 import { NextResponse } from "next/server";
 import { attachSession, hashPassword } from "@/lib/auth";
-import { createSession, createUser, findUserByEmail, toPublicUser } from "@/lib/store";
+import { isSmtpConfigured } from "@/lib/mail";
+import {
+  consumeRegisterCode,
+  createSession,
+  createUser,
+  findUserByEmail,
+  toPublicUser,
+} from "@/lib/store";
 
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as {
     name?: string;
     email?: string;
     password?: string;
+    code?: string;
   };
   const name = body.name?.trim() ?? "";
   const email = body.email?.trim().toLowerCase() ?? "";
   const password = body.password ?? "";
+  const code = body.code?.trim() ?? "";
 
   if (name.length < 1 || name.length > 20) {
     return NextResponse.json({ error: "姓名长度为 1–20 个字符" }, { status: 400 });
@@ -21,8 +30,23 @@ export async function POST(req: Request) {
   if (password.length < 6 || password.length > 72) {
     return NextResponse.json({ error: "密码至少 6 位" }, { status: 400 });
   }
+  if (!/^\d{6}$/.test(code)) {
+    return NextResponse.json({ error: "请填写 6 位邮箱验证码" }, { status: 400 });
+  }
+  if (!isSmtpConfigured()) {
+    return NextResponse.json(
+      { error: "服务器未配置 QQ SMTP，暂无法邮箱验证注册" },
+      { status: 503 },
+    );
+  }
   if (await findUserByEmail(email)) {
     return NextResponse.json({ error: "该邮箱已注册" }, { status: 409 });
+  }
+  if (!(await consumeRegisterCode(email, code))) {
+    return NextResponse.json(
+      { error: "验证码错误或已过期，请重新获取" },
+      { status: 400 },
+    );
   }
 
   try {

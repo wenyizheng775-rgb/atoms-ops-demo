@@ -84,6 +84,9 @@ async function readStore(): Promise<StoreData> {
   data.sessions = (data.sessions ?? []).filter(
     (s) => +new Date(s.expiresAt) > now,
   );
+  data.emailCodes = (data.emailCodes ?? []).filter(
+    (c) => +new Date(c.expiresAt) > now,
+  );
   return data;
 }
 
@@ -202,6 +205,58 @@ export async function userFromSession(
   if (!session) return null;
   const user = store.users?.find((u) => u.id === session.userId);
   return user ? toPublicUser(user) : null;
+}
+
+export async function saveRegisterCode(
+  email: string,
+  code: string,
+): Promise<void> {
+  return withWriteLock(async () => {
+    const store = await readStore();
+    const key = email.trim().toLowerCase();
+    store.emailCodes = (store.emailCodes ?? []).filter((c) => c.email !== key);
+    store.emailCodes.push({
+      email: key,
+      code,
+      purpose: "register",
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    });
+    await writeStore(store);
+  });
+}
+
+export async function consumeRegisterCode(
+  email: string,
+  code: string,
+): Promise<boolean> {
+  return withWriteLock(async () => {
+    const store = await readStore();
+    const key = email.trim().toLowerCase();
+    const now = Date.now();
+    const found = (store.emailCodes ?? []).find(
+      (c) =>
+        c.email === key &&
+        c.purpose === "register" &&
+        c.code === code.trim() &&
+        +new Date(c.expiresAt) > now,
+    );
+    if (!found) return false;
+    store.emailCodes = (store.emailCodes ?? []).filter(
+      (c) => !(c.email === key && c.purpose === "register"),
+    );
+    await writeStore(store);
+    return true;
+  });
+}
+
+export async function lastRegisterCodeAt(email: string): Promise<number | null> {
+  const store = await readStore();
+  const key = email.trim().toLowerCase();
+  const row = (store.emailCodes ?? []).find(
+    (c) => c.email === key && c.purpose === "register",
+  );
+  return row ? +new Date(row.createdAt) : null;
 }
 
 export async function createProject(input: {

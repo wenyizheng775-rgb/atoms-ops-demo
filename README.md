@@ -35,7 +35,7 @@
 
 目前实现的主要能力包括：
 
-- **注册登录：** 邮箱注册 / 登录，会话 Cookie；项目按账号隔离（公开页仍可匿名访问）。
+- **注册登录：** 邮箱注册（QQ SMTP 验证码）/ 登录，会话 Cookie；项目按账号隔离（公开页仍可匿名访问）。
 - **AI 应用生成：** 接入 DeepSeek API，根据自然语言需求生成应用，并支持迭代修改。
 - **可视化预览：** 在网页中展示生成结果，支持体验页面交互。
 - **自动化门禁：** 对生成产物进行规则检查，并将检查结果用于发布决策。
@@ -90,5 +90,7 @@ http://localhost:3000
 | `DEEPSEEK_API_KEY` | 必填，仅服务端 |
 | `DEEPSEEK_MODEL` | 可选，默认 `deepseek-chat` |
 | `GATE_SLO_MIN` | 可选，运维看板 SLO 阈值，默认 `99` |
+| `SMTP_USER` / `SMTP_PASS` | 注册验证码；QQ 邮箱 + **授权码** |
+| `SMTP_HOST` / `SMTP_PORT` | 可选，默认 `smtp.qq.com` / `465` |
 
 部署见 [docs/deploy-rocky9.md](./docs/deploy-rocky9.md)。
