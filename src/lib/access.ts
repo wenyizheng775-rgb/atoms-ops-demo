@@ -4,7 +4,7 @@ import { getProject } from "./store";
 import type { Project, PublicUser } from "./types";
 
 export function canAccessProject(project: Project, userId: string): boolean {
-  return !project.ownerId || project.ownerId === userId;
+  return project.ownerId === userId;
 }
 
 export async function requireOwnedProject(

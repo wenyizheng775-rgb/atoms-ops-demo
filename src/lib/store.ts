@@ -122,7 +122,7 @@ export async function ensureSeedProjects(): Promise<StoreData> {
 export async function listProjects(userId: string): Promise<Project[]> {
   const store = await ensureSeedProjects();
   return store.projects
-    .filter((p) => !p.ownerId || p.ownerId === userId)
+    .filter((p) => p.ownerId === userId)
     .sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
 }
 

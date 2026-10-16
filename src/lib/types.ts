@@ -95,7 +95,7 @@ export interface PublicUser {
 
 export interface Project {
   id: string;
-  /** 为空表示升级前的旧项目，任意已登录用户可见 */
+  /** 所属用户；无 ownerId 的旧数据不在列表中展示，也不能操作 */
   ownerId?: string | null;
   name: string;
   prompt: string;
