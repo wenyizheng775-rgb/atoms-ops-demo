@@ -1,6 +1,6 @@
 # Rocky Linux 9 部署
 
-Nginx `:80` → PM2 应用 `127.0.0.1:3000`。
+Nginx `:8080` → PM2 应用 `127.0.0.1:3000`（不占用 80，避免影响原有站点）。
 
 ## 环境
 
@@ -10,8 +10,8 @@ curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
 sudo dnf -y install nodejs
 sudo npm i -g pm2
 
-# 防火墙与云安全组放行 TCP 80
-sudo firewall-cmd --permanent --add-service=http
+# 防火墙与云安全组放行 TCP 8080
+sudo firewall-cmd --permanent --add-port=8080/tcp
 sudo firewall-cmd --reload
 ```
 
@@ -33,7 +33,7 @@ sudo cp deploy/nginx-atoms-ops.conf /etc/nginx/conf.d/atoms-ops.conf
 sudo nginx -t && sudo systemctl enable --now nginx && sudo systemctl reload nginx
 ```
 
-验收：`curl -s http://127.0.0.1:3000/api/health`，浏览器打开公网 IP。
+验收：`curl -s http://127.0.0.1:3000/api/health`，浏览器打开 `http://公网IP:8080/`。
 
 ## 更新
 
@@ -45,7 +45,7 @@ cd /opt/atoms-ops-demo && git pull && npm ci && npm run build && pm2 restart ato
 
 | 现象 | 排查 |
 |---|---|
-| 外网打不开 | 安全组 / firewalld / Nginx listen 80 |
+| 外网打不开 | 安全组 / firewalld / Nginx listen 8080 |
 | 502 | `pm2 status` / `pm2 logs` |
 | 生成失败 | `.env.local`；出网访问 DeepSeek |
 | 刷新丢数据 | `data/` 是否可写 |
